@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+      "module": "UMD",
+      "noImplicitAny": true,
+      "removeComments": true,
+      "preserveConstEnums": true,
+      "sourceMap": true,
+      "target": "ES2017",
+      "outDir": "dist",
+      "declaration": true,
+      "moduleResolution": "Node"
+    },
+    "files": [
+      "./index.ts"
+    ]
+  }
