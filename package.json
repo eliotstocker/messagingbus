@@ -1,0 +1,31 @@
+{
+  "name": "messagingbus",
+  "version": "1.4.0",
+  "description": "A cross frame/window messaging system",
+  "main": "dist/index.min.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:docs": "tsdoc --src=index.ts",
+    "build:ts": "tsc",
+    "build:lib": "esbuild index.ts --bundle --minify --sourcemap --format=iife --outfile=dist/index.min.js",
+    "build:demo": "npm run build:lib; rm -rf public; mkdir public; cp demo/* public/; cp dist/* public/;",
+    "build": "npm run build:ts && npm run build:lib && npm run build:docs",
+    "prepublishOnly": "npm run build"
+  },
+  "author": "Eliot Stocker",
+  "license": "UNLICENCED",
+  "devDependencies": {
+    "esbuild": "^0.19.4",
+    "jsdoc-to-markdown": "^5.0.3",
+    "rollup": "^4.0.2",
+    "tsdoc-markdown": "^0.1.0",
+    "typescript": "^5.2.2"
+  },
+  "files": [
+    "dist",
+    "index.ts",
+    "tsconfig.json"
+  ]
+}
