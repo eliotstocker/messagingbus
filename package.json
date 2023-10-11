@@ -1,6 +1,6 @@
 {
   "name": "messagingbus",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "A cross frame/window messaging system",
   "main": "dist/index.min.js",
   "module": "dist/index.js",
