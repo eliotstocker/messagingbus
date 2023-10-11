@@ -1,0 +1,32 @@
+<html>
+    <head>
+        <title>MessagingBus Child</title>
+        <script src="./index.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    </head>
+    <script>
+        const bus = new MessagingBus(`demo-grandchild-${Math.round(Math.random() * 1000)}`);
+
+        bus.addCallback("registered", (_, data, handle) => {
+            try {
+                document.getElementById('handle').innerText = bus.getLocalHandle();
+                document.getElementById('parentName').innerText = bus.getParentHandle();
+            } catch(e) {
+                //ignore, we will thor an error if we havnt yet discovered the parent window
+            }
+        });
+
+        bus.addCallback("message", (_, data, handle) => {
+            alert(`Grandchild recived message from: ${handle} | ${data.text}`);
+        });
+
+        bus.addCallback("request", (_, data, handle) => ({
+            text: `I got your message: ${handle}, thanks, love from your grandchild, ${document.getElementById('handle').innerText}`
+        }));
+    </script>
+    <body>
+        <h3>This is a Grandchild (<span id="handle">loading...</span>)</h3>
+        <h4>parent: <span id="parentName">loading...</span></h4>
+        <button onclick="bus.sendMessageToWindow(window.top.opener ? window.top.opener.top : window.top, 'message', {text: 'Hi Top window, I\'m your grandchild!'})">Send Message specifically to the Top window</button>
+    </body>
+</html>

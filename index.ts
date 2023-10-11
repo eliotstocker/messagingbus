@@ -67,7 +67,7 @@ export class MessagingBus {
     };
 
     /**
-     * @param {string} [handle=main] - a name to register this window under, this wil be used for message/request targeting, so all windows must register unique names
+     * @param handle - a name to register this window under, this wil be used for message/request targeting, so all windows must register unique names
      */
     constructor(handle: string = window.name || 'main') {
         this.boundListener = this.listener.bind(this);
@@ -78,23 +78,30 @@ export class MessagingBus {
 
         this.localHandle = handle;
 
-        if(window.opener) {
-            this.distributeHandle(window.opener.top);
+        this.distributeHandle(this.getTopWindow());
+        if(this.getDistributeOutsideOfImediateTree()) {
+            this.distributeHandle(this.getTopWindow(false));
         }
-        
-        if(window.top) {
-            this.distributeHandle(window.top)
+    }
+
+    private getDistributeOutsideOfImediateTree() {
+        return !!window.top.opener;
+    }
+
+    private getTopWindow(includeOpener = true) {
+        if(window.top.opener && includeOpener) {
+            return window.top.opener.top;
+        } else if(window.top) {
+            return window.top;
         } else {
-            this.distributeHandle(window);
+            return window;
         }
     }
 
     private distributeHandle(top: Window) : void {
-        console.log('dist', top);
-
         this.iterateWindowFrames(top, (w: Window) => {
             const payload = {
-                isChild: w === window.parent,
+                isChild: w === window.parent || w === window.opener
             };
 
             this.sendToContentWindow(w, {
@@ -106,7 +113,7 @@ export class MessagingBus {
         });
 
         const payload = {
-            isChild: top === window.parent,
+            isChild: top === window.parent || top === window.opener,
         };
 
         this.sendToContentWindow(top, {
@@ -248,7 +255,10 @@ export class MessagingBus {
                     this.distributeDescendants(from);
 
                     this.getCallbacks('registered').forEach(fn => {
-                        fn('registered', {}, from);
+                        fn('registered', {
+                            isSelf: event.source == window,
+                            isChild: event.source != window && ((event.source as Window).parent == window || (event.source as Window).opener == window),
+                        }, from);
                     });
 
                     this.log('internal','RECEIVE REGISTRATION', {from});
@@ -305,7 +315,6 @@ export class MessagingBus {
                 return [handle, frameIndex];
             });
 
-
         Object.entries(this.getInternalActiveHandles())
             .forEach(([frameHandle, contentWindow]) => {
                 const filteredWindows = windows
@@ -324,10 +333,8 @@ export class MessagingBus {
     }
 
     private getInternalActiveHandles() : WindowHandles {
-        return Object.entries(this.windowHandles)
-            .filter(([handle, win]) => win && win.self && handle !== this.localHandle)
-            .reduce((acc, [handle, window]) =>
-                Object.assign({}, acc, {[handle]: window}), {});
+        return Object.fromEntries(Object.entries(this.windowHandles)
+            .filter(([handle, win]) => win && win.self && handle !== this.localHandle));
     }
 
     private sendResponse(handle: string, action: string, payload: object, responseCode: number) : Promise<void> {
@@ -367,13 +374,13 @@ export class MessagingBus {
      *
      * A Message is defined as a one shot command with no expected response
      *
-     * @param {string} handle - Registered window handle
-     * @param {string} action - Action string to pass with the payload
-     * @param {Object} payload - the payload data to send with the message
-     * @returns {Promise} you may await this promise as an assurance that the receiving end has acknowledged your message,
+     * @param handle - Registered window handle
+     * @param action - Action string to pass with the payload
+     * @param payload - the payload data to send with the message
+     * @returns you may await this promise as an assurance that the receiving end has acknowledged your message,
      * this only ensures that the message was received and not an assurance of being acted upon
      */
-    public sendMessage(handle: string, action: string, payload: object) : Promise<void> {
+    public sendMessage(handle: string, action: string, payload: object = {}) : Promise<void> {
         return this.getContentWindowByHandle(handle)
             .then(contentWindow => this.sendMessageToWindow(contentWindow, action, payload, handle));
     }
@@ -386,11 +393,11 @@ export class MessagingBus {
      * @param contentWindow - any valid content window in context
      * @param action - Action string to pass with the payload
      * @param payload - the payload data to send with the message
-     * @param [windowHandle] - the handle of the window to which you are sending the message
+     * @param windowHandle - the handle of the window to which you are sending the message
      * @returns you may await this promise as an assurance that the receiving end has acknowledged your message,
      * this only ensures that the message was received and not an assurance of being acted upon
      */
-    public sendMessageToWindow(contentWindow: Window, action: string, payload: object, windowHandle: string) : Promise<void> {
+    public sendMessageToWindow(contentWindow: Window, action: string, payload: object = {}, windowHandle: string = null) : Promise<void> {
         const ackCode = this.getResponseCode();
 
         const ackPromise = new Promise((resolve) => {
@@ -433,16 +440,17 @@ export class MessagingBus {
      *
      * A Message is defined as a one shot command with no expected response
      *
-     * @param {string} action - Action string to pass with the payload
-     * @param {object} payload - the payload data to send with the message
-     * @param {boolean} [directDescendantsOnly=false] - if enabled only sends message to direct descendants of the current window,
-     * this will stop messages propagating to deeper frames or ancestors
-     * @returns {Promise} you may await this promise as an assurance that the all receiving frames have acknowledged your message,
+     * @param action - Action string to pass with the payload
+     * @param payload - the payload data to send with the message
+     * @param directDescendantsOnly - if enabled only sends message to direct descendants of the current window,this will stop messages propagating to deeper frames or ancestors
+     * @param includeSelf - should send the message to self as well as all other handles
+     * @returns  you may await this promise as an assurance that the all receiving frames have acknowledged your message,
      * this only ensures that the message was received and not an assurance of being acted upon
      */
-    public sendMessageToAll(action: string, payload:object, directDescendantsOnly: boolean = false) : Promise<void[]>  {
+    public sendMessageToAll(action: string, payload:object = {}, directDescendantsOnly: boolean = false, includeSelf = false) : Promise<void[]>  {
         return Promise.all(Object.keys(this.getInternalActiveHandles())
             .filter(handle => !directDescendantsOnly || this.directDescendants.includes(handle))
+            .filter(handle => includeSelf || this.localHandle != handle)
             .map(handle => {
                 return this.sendMessage(handle, action, payload)
             }));
@@ -453,14 +461,14 @@ export class MessagingBus {
      *
      * A Message is defined as a one shot command with no expected response
      *
-     * @param {RegExp} pattern - regular expression for filtering window handles
-     * @param {string} action - Action string to pass with the payload
-     * @param {object} payload - the payload data to send with the message
-     * @param {boolean} [directDescendantsOnly=false] - if enabled only sends message to direct descendants of the current window,
-     * @returns {Promise} you may await this promise as an assurance that the all receiving frames have acknowledged your message,
+     * @param pattern - regular expression for filtering window handles
+     * @param action - Action string to pass with the payload
+     * @param payload - the payload data to send with the message
+     * @param directDescendantsOnly - if enabled only sends message to direct descendants of the current window,
+     * @returns Promise you may await this promise as an assurance that the all receiving frames have acknowledged your message,
      * this only ensures that the message was received and not an assurance of being acted upon
      */
-    public sendFilteredMessage(pattern: RegExp, action: string, payload: object, directDescendantsOnly: boolean = false) : Promise<void[]> {
+    public sendFilteredMessage(pattern: RegExp, action: string, payload: object = {}, directDescendantsOnly: boolean = false) : Promise<void[]> {
         return Promise.all(Object.keys(this.getInternalActiveHandles())
             .filter(handle => !directDescendantsOnly || this.directDescendants.includes(handle))
             .filter(handle => handle.match(pattern))
@@ -513,7 +521,7 @@ export class MessagingBus {
             return null;
         }
 
-        return handles[0][0];
+        return handles[0];
     }
 
     private waitFor(waitFunction: Function, onSuccess: Function, onFail: Function, timeout: number) : number {
@@ -557,7 +565,7 @@ export class MessagingBus {
      * @param timeout - maximum time in milliseconds to await a response
      * @returns The response from the specific window referenced by the Handle provided
      */
-    public sendRequest(handle: string, action: string, payload: object, timeout: number = 1000) : Promise<RequestResponder>{
+    public sendRequest(handle: string, action: string, payload: object = {}, timeout: number = 1000) : Promise<RequestResponder>{
         return this.getContentWindowByHandle(handle)
             .then(contentWindow => this.sendRequestToWindow(contentWindow, action, payload, handle, timeout));
     }
@@ -574,7 +582,7 @@ export class MessagingBus {
      * @param timeout - maximum time in milliseconds to await a response
      * @returns The response from the specific window referenced by the Handle provided
      */
-    public sendRequestToWindow(contentWindow: Window, action: string, payload: object, windowHandle: string, timeout: number = 1000) : Promise<RequestResponder> {
+    public sendRequestToWindow(contentWindow: Window, action: string, payload: object = {}, windowHandle: string = null, timeout: number = 1000) : Promise<RequestResponder> {
         const responseCode = this.getResponseCode();
 
         let handle: string|null = windowHandle;
@@ -639,9 +647,10 @@ export class MessagingBus {
      * @param directDescendantsOnly - if enabled only sends message to direct descendants of the current window,
      * @param allowPartialResponse - if enabled wont reject on a missing response within the timeout period unless all requests fail
      * @param timeout - maximum time in milliseconds to await a response
+     * @param includeSelf - should send the request to self as well as all other handles
      * @returns A List of responses from all registered windows
      */
-    public sendRequestToAll(action: string, payload: object, directDescendantsOnly:boolean = false, allowPartialResponse:boolean = false, timeout:number = 1000) : Promise<RequestResponder[]>{
+    public sendRequestToAll(action: string, payload: object = {}, directDescendantsOnly:boolean = false, allowPartialResponse:boolean = false, timeout:number = 1000, includeSelf = false) : Promise<RequestResponder[]>{
         return (new Promise(resolve => {
             if(Object.keys(this.getInternalActiveHandles()).length < 1) {
                 return setTimeout(() => {
@@ -651,7 +660,8 @@ export class MessagingBus {
             return resolve(this.getInternalActiveHandles());
         }) as Promise<WindowHandles>)
             .then(handles => this.sendToMultiple(Object.keys(handles)
-                    .filter(handle => !directDescendantsOnly || this.directDescendants.includes(handle)),
+                    .filter(handle => !directDescendantsOnly || this.directDescendants.includes(handle))
+                    .filter(handle => includeSelf || this.localHandle != handle),
                 action, payload, allowPartialResponse, timeout));
     }
 
@@ -667,7 +677,7 @@ export class MessagingBus {
      * @param timeout - maximum time in milliseconds to await a response
      * @returns A List of responses from all registered windows
      */
-    public sendFilteredRequest(pattern: RegExp, action: string, payload: object, directDescendantsOnly:boolean = false, allowPartialResponse:boolean = false, timeout: number = 1000) : Promise<RequestResponder[]> {
+    public sendFilteredRequest(pattern: RegExp, action: string, payload: object = {}, directDescendantsOnly:boolean = false, allowPartialResponse:boolean = false, timeout: number = 1000) : Promise<RequestResponder[]> {
         return (new Promise(resolve => {
             if(Object.keys(this.getInternalActiveHandles()).length < 1) {
                 return setTimeout(() => {
@@ -746,23 +756,35 @@ export class MessagingBus {
         window.removeEventListener('message', this.listener);
         window.removeEventListener('beforeunload', this.destroy);
     }
-
+    
+    /**
+     * get your local handle from this instance
+     * @returns this instance of MessagingBus handle when talking with other instances
+     */
+    public getLocalHandle() : string {
+        return this.localHandle;
+    }
+    
     /**
      * returns all currently registered handles for valid windows
-     * @returns {string[]}
+     * @param includeSelf weather to include this window (any instances of MessagingBus on this window will be ignored)
+     * @returns all registered window handles
      */
-    getActiveHandles() : String[] {
-        return Object.keys(this.getActiveHandles());
+    public getActiveHandles(includeSelf = false) : String[] {
+        return [
+            ...Object.keys(this.getInternalActiveHandles()),
+            ...(includeSelf ? [this.localHandle] : [])
+        ]
     }
 
     /**
      * returns the handle string for the current frames parent
-     * @return {string} handle of the parent frame
+     * @return handle of the parent frame
      * @throws Error if the parent window is not a registered instance
      */
-    getParentHandle() : string {
+    public getParentHandle() : string {
         const [parentHandle] = Object.entries(this.getInternalActiveHandles()).find(([_, value]) => {
-            return value === window.parent;
+            return value === window.parent || value == window.opener;
         }) || [];
 
         if(!parentHandle) {
@@ -772,7 +794,7 @@ export class MessagingBus {
         return parentHandle;
     }
 
-    log(level: string, msg: string, data: any) : void {
+    private log(level: string, msg: string, data: any) : void {
         const debug = localStorage.getItem('messagingbus__debug');
         const logLevel = localStorage.getItem('messagingbus__debugLevel') || ['send', 'request'];
         let logColor = localStorage.getItem(`messagingbus__debugColor.${this.localHandle}`);

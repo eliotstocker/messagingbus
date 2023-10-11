@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:docs": "tsdoc --src=index.ts",
     "build:ts": "tsc",
-    "build:lib": "esbuild browser.ts --bundle --minify --sourcemap --format=iife --outfile=dist/index.min.js",
+    "build:lib": "esbuild browser.ts --bundle --minify --sourcemap --format=iife --outfile=dist/index.min.js --allow-overwrite",
     "build:demo": "npm run build:lib; rm -rf public; mkdir public; cp demo/* public/; cp dist/* public/;",
     "build": "npm run build:ts && npm run build:lib && npm run build:docs",
     "prepublishOnly": "npm run build"

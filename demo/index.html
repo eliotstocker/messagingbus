@@ -1,0 +1,99 @@
+<html>
+    <head>
+        <title>MessagingBus Demo</title>
+        <script src="./index.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+        <style>
+            iframe {
+                border: 1px solid var(--background-alt);
+                border-radius: 3px;
+                box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+                margin: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <button onclick="bus.sendMessageToAll('message', {text: 'hi all of my children and grandchildren'})">Send Message to All Handles</button>
+            <button onclick="bus.sendRequestToAll('request').then(r => alert(r.map(({response}) => response.text).join('\n')))">Send Request to All Handles</button>
+            <button onclick="bus.sendFilteredMessage(/-grandchild-/, 'message', {text: 'hi all of my grandchildren'})">Send Message to only Grand Children</button>
+            <button onclick="bus.sendFilteredRequest(/-grandchild-/, 'request').then(r => alert(r.map(({response}) => response.text).join('\n')))">Send Resuest to only Grand Children</button>
+            <button onclick="enableDebug()">Enable Debugging (in console, persists between sessions)</button>
+            <button onclick="disableDebug()">Disable Debugging</button>
+        </div>
+        <iframe width="300" height="300" src="./child.html"></iframe>
+        <iframe width="300" height="300" src="./child.html"></iframe>
+
+        <button onclick="window.open('./child.html');">Open New Tab Child</button>
+        <button onclick="window.open('./child.html', 'popout child', 'scrollbars=no,resizable=no,status=no,location=no,toolbar=no,menubar=no,width=300,height=300');">Open New Window Child</button>
+
+        <h2>Window Handles Registered</h2>
+        <ul id="handles"></ul>
+
+        <template id="windowHandleTemplate">
+            <li>
+                <div id="windowName"></div>
+                <div id="windowButtons">
+                    <Button onclick="sendMessage(event)">Send Message</Button>
+                    <Button onclick="sendRequest(event)">Send Request</Button>
+                </div>
+            </li>
+        </template>
+
+        <script>
+            const bus = new MessagingBus('demo-parent');
+
+            const handles = document.getElementById('handles');
+            const template = document.getElementById("windowHandleTemplate");
+
+            bus.addCallback("registered", (_, data, handle) => {
+                const li = template.content.cloneNode(true);
+
+                li.querySelector("#windowName").innerText = handle;
+                li.firstElementChild.id = handle;
+
+                if(data.isSelf) {
+                    li.querySelector('#windowButtons').innerText = 'This Window';
+                }
+
+                handles.appendChild(li);
+            });
+
+            bus.addCallback("deregistered", (_, data, handle) => {
+                const li = handles.querySelector(`#${handle}`);
+
+                if(li) {
+                    handles.removeChild(li);
+                }
+            });
+
+            bus.addCallback("message", (_, data, handle) => {
+                alert(`Top window recived message from: ${handle} | ${data.text}`);
+            });
+
+            function sendMessage(event) {
+                const li = event.target.parentElement.parentElement;
+                bus.sendMessage(li.id, 'message', {text: "Hi from the main demo page!"});
+            }
+
+            function sendRequest(event) {
+                const li = event.target.parentElement.parentElement;
+                bus.sendRequest(li.id, 'request')
+                    .then(({handle, response}) => {
+                        alert(`recieved response from: ${handle}\n${response.text}`)
+                    })
+                    .catch(e => {
+                        alert(`error with request to: ${li.id} | ${e}`);
+                    });
+            }
+
+            function enableDebug() {
+                localStorage.setItem('messagingbus__debug', '*');
+            }
+
+            function disableDebug() {
+                localStorage.removeItem('messagingbus__debug');
+            }
+        </script>
+    </body>
+</html>

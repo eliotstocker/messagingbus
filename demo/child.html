@@ -1,0 +1,34 @@
+<html>
+    <head>
+        <title>MessagingBus Child</title>
+        <script src="./index.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+        <script>
+            const bus = new MessagingBus(`demo-child-${Math.round(Math.random() * 1000)}`);
+
+            bus.addCallback("registered", (_, data, handle) => {
+                try {
+                    document.getElementById('handle').innerText = bus.getLocalHandle();
+                    document.getElementById('parentName').innerText = bus.getParentHandle();
+                } catch(e) {
+                    //ignore, we will thor an error if we havnt yet discovered the parent window
+                }
+            });
+
+            bus.addCallback("message", (_, data, handle) => {
+                alert(`Child recived message from: ${handle} | ${data.text}`);
+            });
+
+            bus.addCallback("request", (_, data, handle) => ({
+                text: `I got your message: ${handle}, thanks, love from child, ${document.getElementById('handle').innerText}`
+            }));
+        </script>
+    </head>
+    <body>
+        <h3>This is a Child (<span id="handle">loading...</span>)</h3>
+        <h4>parent: <span id="parentName">loading...</span></h4>
+        <button onclick="bus.sendMessageToAll('message', {text: 'Hi Children, I\'m your decendant!'}, true)">Send Message to Decendents</button>
+        <button onclick="bus.sendFilteredMessage(/-grandchild-/,'message', {text: 'Hi Children, I\'m a decendant, but possibly not yours!'})">Send Message to all Grandchildren</button>
+        <iframe width="300" height="150" src="./grandchild.html"></iframe>
+    </body>
+</html>

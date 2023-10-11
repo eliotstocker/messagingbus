@@ -1,3 +1,3 @@
-import MessagingBus from '.';
+import MessagingBus from './index';
 
 globalThis.MessagingBus = MessagingBus;

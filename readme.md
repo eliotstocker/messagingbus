@@ -145,9 +145,9 @@ responses to not return in a request to multiple frames/windows.
 - [addCallback](#gear-addcallback)
 - [removeCallback](#gear-removecallback)
 - [destroy](#gear-destroy)
+- [getLocalHandle](#gear-getlocalhandle)
 - [getActiveHandles](#gear-getactivehandles)
 - [getParentHandle](#gear-getparenthandle)
-- [log](#gear-log)
 
 #### :gear: sendMessage
 
@@ -157,7 +157,7 @@ A Message is defined as a one shot command with no expected response
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendMessage` | `(handle: string, action: string, payload: object) => Promise<void>` |
+| `sendMessage` | `(handle: string, action: string, payload?: object) => Promise<void>` |
 
 Parameters:
 
@@ -174,7 +174,7 @@ A Message is defined as a one shot command with no expected response
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendMessageToWindow` | `(contentWindow: Window, action: string, payload: object, windowHandle: string) => Promise<void>` |
+| `sendMessageToWindow` | `(contentWindow: Window, action: string, payload?: object, windowHandle?: string) => Promise<void>` |
 
 Parameters:
 
@@ -192,14 +192,14 @@ A Message is defined as a one shot command with no expected response
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendMessageToAll` | `(action: string, payload: object, directDescendantsOnly?: boolean) => Promise<void[]>` |
+| `sendMessageToAll` | `(action: string, payload?: object, directDescendantsOnly?: boolean, includeSelf?: boolean) => Promise<void[]>` |
 
 Parameters:
 
 * `action`: - Action string to pass with the payload
 * `payload`: - the payload data to send with the message
-* `directDescendantsOnly`: - if enabled only sends message to direct descendants of the current window,
-this will stop messages propagating to deeper frames or ancestors
+* `directDescendantsOnly`: - if enabled only sends message to direct descendants of the current window,this will stop messages propagating to deeper frames or ancestors
+* `includeSelf`: - should send the message to self as well as all other handles
 
 
 #### :gear: sendFilteredMessage
@@ -210,7 +210,7 @@ A Message is defined as a one shot command with no expected response
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendFilteredMessage` | `(pattern: RegExp, action: string, payload: object, directDescendantsOnly?: boolean) => Promise<void[]>` |
+| `sendFilteredMessage` | `(pattern: RegExp, action: string, payload?: object, directDescendantsOnly?: boolean) => Promise<void[]>` |
 
 Parameters:
 
@@ -228,7 +228,7 @@ A Request is defined as a command expecting and awaiting a response, if no respo
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendRequest` | `(handle: string, action: string, payload: object, timeout?: number) => Promise<RequestResponder>` |
+| `sendRequest` | `(handle: string, action: string, payload?: object, timeout?: number) => Promise<RequestResponder>` |
 
 Parameters:
 
@@ -246,7 +246,7 @@ A Request is defined as a command expecting and awaiting a response, if no respo
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendRequestToWindow` | `(contentWindow: Window, action: string, payload: object, windowHandle: string, timeout?: number) => Promise<RequestResponder>` |
+| `sendRequestToWindow` | `(contentWindow: Window, action: string, payload?: object, windowHandle?: string, timeout?: number) => Promise<RequestResponder>` |
 
 Parameters:
 
@@ -265,7 +265,7 @@ A Request is defined as a command expecting and awaiting a response, if no respo
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendRequestToAll` | `(action: string, payload: object, directDescendantsOnly?: boolean, allowPartialResponse?: boolean, timeout?: number) => Promise<RequestResponder[]>` |
+| `sendRequestToAll` | `(action: string, payload?: object, directDescendantsOnly?: boolean, allowPartialResponse?: boolean, timeout?: number, includeSelf?: boolean) => Promise<RequestResponder[]>` |
 
 Parameters:
 
@@ -274,6 +274,7 @@ Parameters:
 * `directDescendantsOnly`: - if enabled only sends message to direct descendants of the current window,
 * `allowPartialResponse`: - if enabled wont reject on a missing response within the timeout period unless all requests fail
 * `timeout`: - maximum time in milliseconds to await a response
+* `includeSelf`: - should send the request to self as well as all other handles
 
 
 #### :gear: sendFilteredRequest
@@ -284,7 +285,7 @@ A Request is defined as a command expecting and awaiting a response, if no respo
 
 | Method | Type |
 | ---------- | ---------- |
-| `sendFilteredRequest` | `(pattern: RegExp, action: string, payload: object, directDescendantsOnly?: boolean, allowPartialResponse?: boolean, timeout?: number) => Promise<RequestResponder[]>` |
+| `sendFilteredRequest` | `(pattern: RegExp, action: string, payload?: object, directDescendantsOnly?: boolean, allowPartialResponse?: boolean, timeout?: number) => Promise<RequestResponder[]>` |
 
 Parameters:
 
@@ -332,13 +333,26 @@ deregister handle from all listeners
 | ---------- | ---------- |
 | `destroy` | `() => void` |
 
+#### :gear: getLocalHandle
+
+get your local handle from this instance
+
+| Method | Type |
+| ---------- | ---------- |
+| `getLocalHandle` | `() => string` |
+
 #### :gear: getActiveHandles
 
 returns all currently registered handles for valid windows
 
 | Method | Type |
 | ---------- | ---------- |
-| `getActiveHandles` | `() => String[]` |
+| `getActiveHandles` | `(includeSelf?: boolean) => String[]` |
+
+Parameters:
+
+* `includeSelf`: weather to include this window (any instances of MessagingBus on this window will be ignored)
+
 
 #### :gear: getParentHandle
 
@@ -347,12 +361,6 @@ returns the handle string for the current frames parent
 | Method | Type |
 | ---------- | ---------- |
 | `getParentHandle` | `() => string` |
-
-#### :gear: log
-
-| Method | Type |
-| ---------- | ---------- |
-| `log` | `(level: string, msg: string, data: any) => void` |
 
 
 <!-- TSDOC_END -->
