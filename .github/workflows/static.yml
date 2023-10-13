@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v1
         with:
-          node-version: 16.x
+          node-version: 18.x
       - run: npm ci
       - run: npm run build
       - run: cp dist/index.min.* demo/
