@@ -18,7 +18,6 @@
   "license": "UNLICENCED",
   "devDependencies": {
     "esbuild": "^0.19.4",
-    "jsdoc-to-markdown": "^5.0.3",
     "rollup": "^4.0.2",
     "tsdoc-markdown": "^0.1.0",
     "typescript": "^5.2.2"
